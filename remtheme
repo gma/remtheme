@@ -1,0 +1,266 @@
+#!/usr/bin/perl -w
+#
+# remtheme removes a Window Maker theme from a user's ~/G/L/W/Themes directory, 
+# or optionally (if you have write access) from the global WindowMaker 
+# directory.
+#
+# Author:  Graham Ashton <graz@mindless.com>
+# Date:    13/01/99
+# Version: 0.5
+#
+# run "perldoc ./remtheme" for documentation
+#
+# if you prefer reading manpages, you can convert the documentation into a man 
+# page using Perl's pod2man converter;
+#
+#   pod2man remtheme > /usr/local/man/man1/remtheme.1
+
+use strict;
+use vars qw($opt_verbose $file $theme
+            $wm_path $pm_path $bg_path $th_path $deleted @deleted);
+
+use Getopt::Long;
+use File::Basename;
+use File::Path qw(rmtree);
+
+
+# parse command line options
+GetOptions(verbose => \$opt_verbose);
+
+# get the theme's filename, and convert into a fully qualified path
+$file = shift || usage_message();
+if (! -e $file) { die "can't find $file: $!\n" }
+
+if ($file =~ '^~/') {
+    # expand leading '~' to '/path/to/home/directory'
+    my($home) = $ENV{'HOME'};
+    $file =~ s/^~/$home/;
+}
+
+elsif ($file !~ '^/') {
+    # path doesn't start with /, so must be relative -> prepend current 
+    # directory
+    my($cwd) = `pwd`;
+    chomp $cwd;
+    $file = "$cwd/$file";
+}
+
+# check that we're actually trying to delete a files from within the Themes
+# directory, not just any old file
+if ($file !~ m'WindowMaker/Themes/.') {
+    warn "$file is not in a Themes directory\n\n";
+    usage_message();
+}
+
+# set up the names of directories we'll need to look in to delete pixmaps
+if ($file =~ /$ENV{'HOME'}/) {
+    if ($ENV{'GNUSTEP_USER_ROOT'}) { 
+        $wm_path = "$ENV{'GNUSTEP_USER_ROOT'}/Library/WindowMaker";
+    }
+    else { 
+        $wm_path = "$ENV{'HOME'}/GNUstep/Library/WindowMaker";
+    }
+}
+else {
+    ($wm_path) = $file =~ m'^(.*)/Themes';
+}
+$pm_path = "$wm_path/Pixmaps";
+$bg_path = "$wm_path/Backgrounds";
+$theme = fileparse($file);
+
+
+# delete pixmaps that come with the theme
+open THEME, "$file";
+LINE: while (<THEME>) {
+    my ($type, $pixmap);
+    next LINE if (! /pixmap/);
+    ($type, $pixmap) = /(\w+)\s?=\s?\(\s?\w+\s?,\s?([" \w\d\.-]+?)\s?,/;
+    if (! defined($type) and ! defined($pixmap) ) {
+        warn "potential problem parsing $theme\n";
+        next LINE;
+    }
+    else { $pixmap =~ s/"//g }
+
+    if (unlink("$pm_path/$pixmap") || unlink("$bg_path/$pixmap")) {
+        push @deleted, $pixmap;
+        print "deleted $pixmap ($type)\n" if $opt_verbose;
+    }
+    elsif (deleted($pixmap)) {
+        print "already deleted $pixmap ($type)\n" if $opt_verbose;
+    }
+    else {
+        warn "can't delete $pixmap ($type): $!\n";
+    }
+}
+close THEME;
+
+# delete the themefile
+if (unlink "$file") {
+    print "deleted $file (Theme)\n" if $opt_verbose;
+}
+else {
+    die "can't delete $theme (Theme): $!\n";
+}
+
+# guess the names of .lsm and README files, and remove them if they exist
+{
+   my (@crap, $name1, $name2);
+   $name1 = $name2 = $theme;
+   $name1 =~ s/ //g;
+   $name2 =~ s/ /_/g;
+   @crap = ("$theme.lsm", "README.$theme", "$theme.README",
+            "$name1.lsm", "README.$name1", "$name1.README",
+            "$name2.lsm", "README.$name2", "$name2.README");
+   foreach $file (@crap) {
+      if (-w "$wm_path/$file") {
+         if (unlink("$wm_path/$file")) {
+            print "deleted $file\n" if $opt_verbose;
+         }
+         else { warn "can't delete $file: $!\n" }
+      }
+   }
+}
+
+
+# Subroutines
+
+sub deleted {
+   my ($file) = @_;
+
+   my ($d);
+
+   foreach $d (@deleted) { return 1 if ($file eq $d) }
+
+   return 0;
+}
+
+sub usage_message {
+   my ($script);
+   
+   ($script) = fileparse($0);
+
+   die "Usage: $script [--verbose] <themefile>\n";
+}
+
+
+=head1 NAME
+
+remtheme - remove a Window Maker theme
+
+=head1 SYNOPSIS
+
+remtheme [--verbose] <themefile>
+
+where <themefile> is the path to the themefile to remove.
+
+Examples:
+
+  remtheme ~/GNUstep/Library/WindowMaker/Themes/MyTheme
+
+  cd ~/GNUstep/Library/WindowMaker
+  remtheme Themes/MyTheme
+
+  remtheme /usr/local/share/WindowMaker/Themes/Pastel
+
+=head1 DESCRIPTION
+
+remtheme attempts to remove a Window Maker theme, and all files associated
+with it.
+
+Prior to Window Maker 0.20.4, themes consisted of both a themefile (which 
+defined which graphic files to use in a theme), and the individual graphics
+files. Root background graphics would be stored in one directory whilst icon, 
+titlebar and menubar backgrounds would be stored in another. In order to 
+delete all the files in a theme you needed to read the themefile, find the
+the graphics files, and delete them by hand.
+
+remtheme was written to simplify the removal of these themes. 
+
+As of Window Maker 0.20.4 the getstyle(1) and setstyle(1) utilities support
+theme 'packs' where all files in a theme are stored in a seperate directory.
+This makes theme management much easier - to remove a theme pack you just
+delete it's directory. You don't need remtheme to delete a theme pack. In fact, 
+remtheme doesn't currently support the removal of theme packs.
+
+=head1 CONFIGURATION
+
+The configuration is minimal. First check that the top line of the script 
+points to the correct location of the perl(1) interpreter on your system. 
+If you're not sure where your perl interpreter is, you can check by typing;
+
+  which perl
+
+My perl interpreter is at /usr/bin/perl, so that's the default.
+
+To install remtheme as an option in Window Maker's root menu, do the following;
+
+=over
+
+=item *
+
+add a new 'External Menu' to your root menu with WPrefs.app. 
+
+=item *
+
+set the 'Menu Path/Directory List' field to the Themes directory.
+For example;
+ 
+'~/GNUstep/Library/WindowMaker/Themes')
+
+=item *
+
+set the 'Program to open files' field to 'remtheme'. 
+
+=item *
+
+Make sure that remtheme is in your path.
+
+=back
+
+That should do it.
+
+=head1 TODO
+
+=over
+
+=item *
+
+Support the new theme pack format (new as of Window Maker 0.20.4).
+
+=item *
+
+Neaten the script up with subroutines, and the like (it's not exactly what 
+you'd call structured programming).
+
+=back
+
+=head1 BUGS
+
+=over
+
+=item *
+
+The regex that parses the themefile to extract the pixmaps' filenames may be
+lacking in refinement, but it's worked for everything I've tried it with so
+far.
+
+=back
+
+=head1 SEE ALSO
+
+wmaker(1), getstyle(1), setstyle(1), perl(1).
+
+=head1 LICENCE
+
+This script is released under the GNU Public Licence. All the usual disclaimers 
+apply. 
+
+Any loss of data, time, money, hair etc. as a result of the use of this script 
+is the responsibility of the user. The author will not be liable for any losses
+incurred as the result of the use of this software.
+
+=head1 AUTHOR
+
+Graham Ashton <graz@mindless.com>.
+
+=cut

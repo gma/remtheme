@@ -1,0 +1,31 @@
+remtheme - remove a Window Maker theme
+
+Author: Graham Ashton <graz@mindless.com>
+Date:   13/01/99
+
+
+System requirements
+-------------------
+
+Perl (I have 5.004_04 - I've not tried it with earlier versions)
+Window Maker (obviously)
+
+Installation
+------------
+
+I'd recommend you install remtheme by typing (as root);
+
+  % cp remtheme /usr/local/bin
+
+but it doesn't matter where you put it really. Just make sure that the first
+line of the script points to the location of your perl interpreter.
+
+Read the docs in the script itself with Perl's perldoc utility;
+
+  % perldoc remtheme
+
+You can convert them into a proper manpage (if you prefer) by doing something
+like;
+
+  % pod2man ./remtheme > /usr/local/man/man1/remtheme.1
+
