@@ -4,7 +4,7 @@
 # or optionally (if you have write access) from the global WindowMaker 
 # directory.
 #
-# Author:  Graham Ashton <graz@mindless.com>
+# Author:  Graham Ashton <graham@effectif.com>
 # Date:    13/01/99
 # Version: 0.5
 #
@@ -261,6 +261,6 @@ incurred as the result of the use of this software.
 
 =head1 AUTHOR
 
-Graham Ashton <graz@mindless.com>.
+Graham Ashton <graham@effectif.com>.
 
 =cut
